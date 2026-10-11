@@ -59,6 +59,7 @@ export default function App() {
   const pagesRef = useRef(pages);
   const projectRef = useRef(project);
   projectRef.current = project;
+  useEffect(() => { window.scrollTo(0, 0); }, [project?.id, current?.id, tab, editing]);
   pagesRef.current = pages;
   const input = useRef<HTMLInputElement>(null);
   const retake = useRef<Page | null>(null);

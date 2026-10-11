@@ -5,6 +5,7 @@ node_modules/
 /synthetic-test.png
 /test-results.png
 /preview.png
+/mobile-compact.png
 dist/
 public/vendor/
 *.tsbuildinfo
