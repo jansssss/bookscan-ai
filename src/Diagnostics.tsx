@@ -56,6 +56,33 @@ export default function Diagnostics() {
       )
         throw Error("합성 모서리 오차 > 3.5%");
       log("PASS 실제 OpenCV Canny·윤곽·네 모서리 검출");
+      for (const shadow of [false, true]) {
+        const sample = document.createElement("canvas");
+        sample.width = c.width;
+        sample.height = c.height;
+        const context = sample.getContext("2d")!;
+        context.drawImage(c, 0, 0);
+        if (shadow) {
+          const gradient = context.createLinearGradient(0, 0, c.width, 0);
+          gradient.addColorStop(0, "rgba(0,0,0,.55)");
+          gradient.addColorStop(1, "rgba(0,0,0,0)");
+          context.fillStyle = gradient;
+          context.fillRect(0, 0, c.width, c.height);
+        } else {
+          context.fillStyle = "#d4d0c8";
+          context.fillRect(0, 0, 40, c.height);
+        }
+        const found = await detect(sample);
+        if (
+          !found.quad ||
+          found.quad.some(
+            (p, i) =>
+              Math.hypot(p.x - expected[i].x, p.y - expected[i].y) > 0.035,
+          )
+        )
+          throw Error("배경·그림자 모서리 검출 실패");
+      }
+      log("PASS 배경 경계·밝기 변화가 있는 합성 문서 모서리 검출");
       let image: Blob = blob;
       for (const mode of ["original", "color", "gray", "bw"] as const) {
         image = await correct(blob, detection.quad, mode, 0.9);

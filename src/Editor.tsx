@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import type { Quad, Mode } from "./types";
 import { fullQuad } from "./types";
 import { validQuad } from "./geometry";
-import { correct } from "./vision";
+import { correct, detect } from "./vision";
 export const modeNames: Record<Mode, string> = {
   original: "컬러 원본",
   color: "보정 컬러",
@@ -62,7 +62,9 @@ export default function Editor({
         </div>
         <button onClick={onClose}>닫기</button>
       </div>
-      <p>네 점을 문서 모서리로 이동하세요. 원본은 별도로 보존됩니다.</p>
+      <p>
+        자동으로 모서리를 다시 찾거나 필요한 점만 수정하세요. 원본은 보존됩니다.
+      </p>
       <div
         className="edit-stage"
         ref={stage}
@@ -125,6 +127,36 @@ export default function Editor({
       </div>
       {error && <p className="error">{error}</p>}
       <div className="actions">
+        <button
+          disabled={busy}
+          onClick={async () => {
+            setBusy(true);
+            setError("");
+            try {
+              const bitmap = await createImageBitmap(blob);
+              const canvas = document.createElement("canvas");
+              canvas.width = 960;
+              canvas.height = Math.round((960 * bitmap.height) / bitmap.width);
+              canvas
+                .getContext("2d")!
+                .drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+              bitmap.close();
+              const found = await detect(canvas);
+              if (!found.quad)
+                throw Error(
+                  "영역을 찾기 어렵습니다. 원본 전체를 저장하거나 필요한 점만 수정하세요.",
+                );
+              setQuad(found.quad);
+              setPreview(null);
+            } catch (e) {
+              setError(String(e));
+            } finally {
+              setBusy(false);
+            }
+          }}
+        >
+          모서리 자동 찾기
+        </button>
         <button
           disabled={busy}
           onClick={() => (preview ? setPreview(null) : apply())}

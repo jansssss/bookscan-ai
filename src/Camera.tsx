@@ -5,6 +5,7 @@ import type { Quad, Settings, Detection } from "./types";
 type Props = {
   settings: Settings;
   next: number;
+  queued: number;
   onPhoto: (blob: Blob, quad: Quad | null, hash: number[]) => Promise<void>;
   onClose: () => void;
   onSettings: (s: Settings) => void;
@@ -12,6 +13,7 @@ type Props = {
 export default function Camera({
   settings,
   next,
+  queued,
   onPhoto,
   onClose,
   onSettings,
@@ -21,8 +23,8 @@ export default function Camera({
     gate = useRef(new AutoGate()),
     latest = useRef<Detection | null>(null),
     lock = useRef(false),
-    props = useRef({ settings, onPhoto });
-  props.current = { settings, onPhoto };
+    props = useRef({ settings, onPhoto, queued });
+  props.current = { settings, onPhoto, queued };
   const [device, setDevice] = useState("environment"),
     [error, setError] = useState(""),
     [state, setState] = useState({ stable: false, progress: 0, bad: false }),
@@ -65,7 +67,7 @@ export default function Camera({
               advanced: [{ focusMode: "continuous" } as any],
             })
             .catch(() => {});
-        setMessage("문서의 네 모서리를 화면에 맞춰주세요");
+        setMessage("페이지 전체가 보이게 러프하게 맞춰주세요");
         async function tick() {
           if (!active) return;
           try {
@@ -84,7 +86,7 @@ export default function Camera({
                 performance.now(),
                 props.current.settings.delay,
                 props.current.settings.sensitivity,
-                props.current.settings.auto,
+                props.current.settings.auto && props.current.queued < 5,
               );
               setState({
                 ...evaluation,
@@ -106,7 +108,11 @@ export default function Camera({
                           ? "좋아요 · 움직이지 마세요"
                           : "흔들림 감지 · 카메라를 고정해주세요",
               );
-              if (evaluation.shoot && props.current.settings.auto)
+              if (
+                evaluation.shoot &&
+                props.current.settings.auto &&
+                props.current.queued < 5
+              )
                 await capture();
             }
           } catch (e) {
@@ -132,7 +138,8 @@ export default function Camera({
     };
   }, [device]);
   async function capture() {
-    if (lock.current || !video.current?.videoWidth) return;
+    if (lock.current || props.current.queued >= 5 || !video.current?.videoWidth)
+      return;
     lock.current = true;
     setBusy(true);
     try {
@@ -140,6 +147,7 @@ export default function Camera({
         track = stream.current!.getVideoTracks()[0];
       let blob: Blob | undefined;
       let q = latest.current?.quad || null;
+      const hash = latest.current?.hash || [];
       const ImageCaptureClass = (window as any).ImageCapture;
       if (ImageCaptureClass) {
         try {
@@ -154,10 +162,7 @@ export default function Camera({
           b.close();
           q = (await detect(c)).quad;
           if (Math.abs(ratio - preview) / preview > 0.03) {
-            blob = undefined;
-            setMessage(
-              "사진·영상 비율이 달라 고해상도 영상 프레임을 사용합니다.",
-            );
+            setMessage("고해상도 사진의 모서리를 자동으로 확인했습니다.");
           }
         } catch {}
       }
@@ -174,7 +179,9 @@ export default function Camera({
           ),
         );
       }
-      await props.current.onPhoto(blob, q, latest.current?.hash || []);
+      await props.current.onPhoto(blob, q, hash);
+      gate.current.captured(hash, performance.now());
+      setMessage("촬영 완료 · 다음 페이지를 넘겨주세요");
     } catch (e) {
       setError(String(e));
     } finally {
@@ -238,11 +245,14 @@ export default function Camera({
           )}
         </svg>
         {!quad && (
-          <div className="camera-hint">책과 카메라를 평행하게 맞춰주세요</div>
+          <div className="camera-hint">
+            페이지 전체가 화면에 들어오게 촬영하세요
+          </div>
         )}
       </div>
       <div className="camera-status" role="status">
-        {busy ? "사진 보정·저장 중…" : message}
+        {busy ? "촬영 원본 보관 중…" : message}
+        {queued > 0 && <span> · {queued}장 자동 보정 중 · 다음 촬영 가능</span>}
         <progress value={state.progress} max={1} />
       </div>
       {error && (
@@ -280,7 +290,7 @@ export default function Camera({
         </button>
         <button
           className="shutter"
-          disabled={busy}
+          disabled={busy || queued >= 5}
           onClick={capture}
           aria-label="사진 촬영"
         >
@@ -294,7 +304,8 @@ export default function Camera({
         </button>
       </footer>
       <p className="camera-note">
-        모서리 인식이 어려우면 수동 촬영 후 직접 지정할 수 있어요.
+        촬영 후 자동 보정합니다. 인식이 어려운 사진은 원본 전체를 보관하고
+        나중에 확인할 수 있어요.
       </p>
     </section>
   );

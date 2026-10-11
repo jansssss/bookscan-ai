@@ -61,6 +61,14 @@ describe("실제 자동 촬영 판단", () => {
     expect(gate.update(frame, 4000, 900, 1, false).shoot).toBe(false);
     expect(gate.update(frame, 5000, 900, 1, true).shoot).toBe(true);
   });
+  it("수동 촬영 후 같은 문서를 차단하고 비슷한 다음 페이지는 재촬영", () => {
+    const gate = new AutoGate();
+    gate.captured(frame.hash, 4000);
+    gate.update(frame, 5000, 900, 1);
+    expect(gate.update(frame, 6000, 900, 1).shoot).toBe(false);
+    const next = { ...frame, hash: Array(64).fill(108) };
+    expect(gate.update(next, 6200, 900, 1).shoot).toBe(true);
+  });
   it("교차한 모서리 거부", () => {
     expect(validQuad(fullQuad)).toBe(true);
     expect(

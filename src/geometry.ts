@@ -56,6 +56,12 @@ export class AutoGate {
   private last = 0;
   private hash: number[] = [];
   private armed = true;
+  captured(hash: number[], now: number) {
+    this.hash = hash;
+    this.last = now;
+    this.armed = false;
+    this.since = 0;
+  }
   reset() {
     this.previous = null;
     this.since = 0;
@@ -76,7 +82,7 @@ export class AutoGate {
       d.clipped < 0.4 &&
       (!this.previous || movement(this.previous, d.quad) < 0.012 * sensitivity);
     this.previous = d.quad;
-    if (!d.quad || hashDistance(this.hash, d.hash) > 12) this.armed = true;
+    if (!d.quad || hashDistance(this.hash, d.hash) > 7) this.armed = true;
     if (!stable) {
       this.since = 0;
       return { stable: false, progress: 0, shoot: false };
@@ -84,7 +90,7 @@ export class AutoGate {
     if (!this.since) this.since = now;
     const progress = Math.min(1, (now - this.since) / delay);
     const shoot =
-      enabled && progress === 1 && this.armed && now - this.last > 2500;
+      enabled && progress === 1 && this.armed && now - this.last > 1200;
     if (shoot) {
       this.last = now;
       this.hash = d.hash;

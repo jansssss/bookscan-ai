@@ -44,6 +44,7 @@ export type Page = {
   confidence: number | null;
   words: Word[];
   dewarp?: number;
+  needsReview?: boolean;
   rotation?: number;
   imageBytes?: number;
   originalBytes?: number;

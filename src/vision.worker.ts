@@ -46,38 +46,94 @@ function detect(bitmap: ImageBitmap): Detection {
       if (v < 45) dark++;
     }
     cv.GaussianBlur(gray, blur, new cv.Size(5, 5), 0);
-    cv.Canny(blur, edge, 40, 120);
-    cv.findContours(
-      edge,
-      contours,
-      hierarchy,
-      cv.RETR_LIST,
-      cv.CHAIN_APPROX_SIMPLE,
-    );
-    for (let i = 0; i < contours.size(); i++) {
-      const c = contours.get(i),
-        poly = new cv.Mat();
-      try {
-        cv.approxPolyDP(c, poly, 0.025 * cv.arcLength(c, true), true);
-        const area = cv.contourArea(poly);
-        if (
-          poly.rows === 4 &&
-          cv.isContourConvex(poly) &&
-          area > bitmap.width * bitmap.height * 0.15 &&
-          area > best
-        ) {
-          quad = orderQuad(
-            Array.from({ length: 4 }, (_, i) => ({
-              x: poly.data32S[i * 2] / bitmap.width,
-              y: poly.data32S[i * 2 + 1] / bitmap.height,
-            })),
+    const kernel = cv.getStructuringElement(cv.MORPH_RECT, new cv.Size(5, 5));
+    try {
+      // Broken/shadowed page edges and pale pages need different candidates.
+      for (let pass = 0; pass < 3; pass++) {
+        if (pass === 0) cv.Canny(blur, edge, 25, 85);
+        else if (pass === 1)
+          cv.threshold(blur, edge, 0, 255, cv.THRESH_BINARY | cv.THRESH_OTSU);
+        else
+          cv.adaptiveThreshold(
+            blur,
+            edge,
+            255,
+            cv.ADAPTIVE_THRESH_GAUSSIAN_C,
+            cv.THRESH_BINARY,
+            31,
+            9,
           );
-          best = area;
+        cv.morphologyEx(edge, edge, cv.MORPH_CLOSE, kernel);
+        cv.findContours(
+          edge,
+          contours,
+          hierarchy,
+          cv.RETR_LIST,
+          cv.CHAIN_APPROX_SIMPLE,
+        );
+        for (let i = 0; i < contours.size(); i++) {
+          const c = contours.get(i),
+            hull = new cv.Mat(),
+            poly = new cv.Mat();
+          try {
+            const contourArea = cv.contourArea(c);
+            if (contourArea < bitmap.width * bitmap.height * 0.12) continue;
+            cv.convexHull(c, hull);
+            for (const epsilon of [0.015, 0.025, 0.04]) {
+              cv.approxPolyDP(
+                hull,
+                poly,
+                epsilon * cv.arcLength(hull, true),
+                true,
+              );
+              if (poly.rows !== 4 || !cv.isContourConvex(poly)) continue;
+              const area = cv.contourArea(poly),
+                fraction = area / (bitmap.width * bitmap.height);
+              if (
+                fraction < 0.12 ||
+                fraction > 0.97 ||
+                contourArea / area < 0.7
+              )
+                continue;
+              const candidate = orderQuad(
+                Array.from({ length: 4 }, (_, j) => ({
+                  x: poly.data32S[j * 2] / bitmap.width,
+                  y: poly.data32S[j * 2 + 1] / bitmap.height,
+                })),
+              );
+              // Reject near-full-frame background and extremely skewed inner text boxes.
+              const border = candidate.filter(
+                (p) => p.x < 0.012 || p.x > 0.988 || p.y < 0.012 || p.y > 0.988,
+              ).length;
+              const angles = candidate.map((p, j) => {
+                const a = candidate[(j + 3) % 4],
+                  b = candidate[(j + 1) % 4];
+                const ax = (a.x - p.x) * bitmap.width,
+                  ay = (a.y - p.y) * bitmap.height;
+                const bx = (b.x - p.x) * bitmap.width,
+                  by = (b.y - p.y) * bitmap.height;
+                return Math.abs(
+                  (ax * bx + ay * by) /
+                    (Math.hypot(ax, ay) * Math.hypot(bx, by)),
+                );
+              });
+              if (Math.max(...angles) > 0.8) continue;
+              const score =
+                area * (1 - 0.18 * border) * (1 - 0.2 * Math.max(...angles));
+              if (score > best) {
+                quad = candidate;
+                best = score;
+              }
+            }
+          } finally {
+            c.delete();
+            hull.delete();
+            poly.delete();
+          }
         }
-      } finally {
-        poly.delete();
-        c.delete();
       }
+    } finally {
+      kernel.delete();
     }
     const small = new cv.Mat();
     const hash: number[] = [];

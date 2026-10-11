@@ -3,7 +3,7 @@ import type { Page, Project, Quad, Mode } from "./types";
 import { defaults, fullQuad } from "./types";
 import * as db from "./storage";
 import { correct, thumbnail, spine, dewarp } from "./vision";
-import { hashDistance, mapFromRect } from "./geometry";
+import { mapFromRect } from "./geometry";
 import Camera from "./Camera";
 import Editor from "./Editor";
 import { recognize, orientation } from "./ocr";
@@ -56,13 +56,21 @@ export default function App() {
     [curve, setCurve] = useState(0),
     [curvePreview, setCurvePreview] = useState<Blob | null>(null);
   const pagesRef = useRef(pages);
+  const projectRef = useRef(project);
+  projectRef.current = project;
   pagesRef.current = pages;
   const input = useRef<HTMLInputElement>(null);
   const retake = useRef<Page | null>(null);
-  async function refresh(p = project) {
+  const captureQueue = useRef(Promise.resolve());
+  const [queued, setQueued] = useState(0);
+  async function refresh(p = project, background = false) {
     if (p) {
-      setPages(await db.pages(p.id));
-      setPending(await db.pendingIds(p.id));
+      const saved = await db.pages(p.id);
+      if (!background || projectRef.current?.id === p.id) {
+        pagesRef.current = saved;
+        setPages(saved);
+        setPending(await db.pendingIds(p.id));
+      }
     }
     setProjects(await db.projects());
     const e = await navigator.storage?.estimate();
@@ -143,10 +151,12 @@ export default function App() {
     replace?: Page,
     division?: number,
     stageId?: string,
+    target = project,
+    needsReview = false,
   ) {
-    if (!project) return;
+    if (!target) return;
     const originalId =
-        stageId || (await db.stageCapture(project.id, blob, q, hash)),
+        stageId || (await db.stageCapture(target.id, blob, q, hash)),
       date = new Date().toISOString();
     const regions: Quad[] =
       division !== undefined
@@ -169,7 +179,7 @@ export default function App() {
       division !== undefined ? await correct(blob, q, "original", 0.97) : blob;
     const start =
       replace?.order ||
-      Math.max(0, ...pagesRef.current.map((p) => p.order)) + 1;
+      Math.max(0, ...(await db.pages(target.id)).map((p) => p.order)) + 1;
     const items: Page[] = [];
     for (let i = 0; i < regions.length; i++) {
       setStatus(`${i + 1}/${regions.length} 페이지 보정 중`);
@@ -177,7 +187,7 @@ export default function App() {
         source,
         regions[i],
         mode,
-        project.settings.quality,
+        target.settings.quality,
       );
       let savedQuad = regions[i];
       if (division !== undefined) {
@@ -185,7 +195,7 @@ export default function App() {
       }
       items.push({
         id: replace?.id || crypto.randomUUID(),
-        project: project.id,
+        project: target.id,
         originalId,
         order: start + i,
         image,
@@ -197,11 +207,12 @@ export default function App() {
         text: "",
         confidence: null,
         words: [],
+        needsReview,
       });
     }
     await db.savePages(items, { id: originalId, image: blob });
     setStatus(`${items.length}페이지가 기기에 저장되었습니다.`);
-    await refresh();
+    await refresh(target, true);
   }
   async function photo(blob: Blob, q: Quad | null, hash: number[]) {
     setError("");
@@ -213,30 +224,34 @@ export default function App() {
       setEditing({ blob, quad: q, hash, page: replace, stageId });
       return;
     }
-    if (
-      pagesRef.current.some(
-        (p) => hash.length && hashDistance(p.hash, hash) < 5,
-      )
-    ) {
-      setStatus("중복 페이지 가능성 · 확인 후 저장해주세요.");
-      setCamera(false);
-      setEditing({ blob, quad: q, hash, stageId });
-      return;
-    }
-    if (!q || project?.settings.spread) {
-      setCamera(false);
-      setEditing({ blob, quad: q, hash, stageId });
-      return;
-    }
-    await add(
-      blob,
-      q,
-      hash,
-      project!.settings.mode,
-      undefined,
-      undefined,
-      stageId,
-    );
+    const target = project!;
+    setQueued((n) => n + 1);
+    captureQueue.current = captureQueue.current.then(async () => {
+      try {
+        let division: number | undefined;
+        if (target.settings.spread && q) {
+          const flat = await correct(blob, q, "original", 0.94);
+          const found = await spine(flat);
+          if (found.confident) division = found.position;
+        }
+        await add(
+          blob,
+          q || fullQuad,
+          hash,
+          target.settings.mode,
+          undefined,
+          division,
+          stageId,
+          target,
+          !q || (target.settings.spread && division === undefined),
+        );
+      } catch (e) {
+        setError("보정 실패 · 원본은 보관되었습니다: " + String(e));
+        await refresh(target, true).catch(() => {});
+      } finally {
+        setQueued((n) => n - 1);
+      }
+    });
   }
   async function commit(q: Quad, m: Mode) {
     if (!editing) return;
@@ -271,6 +286,7 @@ export default function App() {
             image,
             thumb: await thumbnail(image),
             quad: q,
+            needsReview: false,
             mode: m,
             text: "",
             confidence: null,
@@ -455,10 +471,11 @@ export default function App() {
     return (
       <>
         <Camera
+          queued={queued}
           settings={project.settings}
           next={
             retake.current?.order ||
-            Math.max(0, ...pages.map((p) => p.order)) + 1
+            Math.max(0, ...pages.map((p) => p.order)) + queued + 1
           }
           onPhoto={photo}
           onClose={() => {
@@ -1237,7 +1254,10 @@ export default function App() {
                       }
                     >
                       <BlobImage blob={p.thumb} alt={`${p.order}페이지 확인`} />
-                      <span>{String(p.order).padStart(3, "0")}</span>
+                      <span>
+                        {String(p.order).padStart(3, "0")}
+                        {p.needsReview ? " · 영역 확인" : ""}
+                      </span>
                     </button>
                     <div className="page-meta">
                       <span>

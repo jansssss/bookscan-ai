@@ -2,6 +2,17 @@ import type { Detection, Mode, Quad } from "./types";
 const worker = new Worker(new URL("./vision.worker.ts", import.meta.url), {
   type: "module",
 });
+let detector: Worker | undefined;
+function detectionWorker() {
+  if (!detector) {
+    detector = new Worker(new URL("./vision.worker.ts", import.meta.url), {
+      type: "module",
+    });
+    detector.onmessage = worker.onmessage;
+    detector.onerror = worker.onerror;
+  }
+  return detector;
+}
 let next = 0;
 const pending = new Map<
   number,
@@ -22,7 +33,7 @@ function request<T>(data: any, bitmap: ImageBitmap): Promise<T> {
   return new Promise((resolve, reject) => {
     const id = ++next;
     pending.set(id, { resolve, reject });
-    worker.postMessage(
+    (data.type === "detect" ? detectionWorker() : worker).postMessage(
       {
         ...data,
         id,

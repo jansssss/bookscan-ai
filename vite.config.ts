@@ -14,7 +14,7 @@ export default defineConfig({
         await writeFile(
           "dist/sw.js",
           sw
-            .replace("bookscan-v1", "bookscan-" + version)
+            .replace(/bookscan-v\d+/, "bookscan-" + version)
             .replace(
               "/* BUILD_ASSETS */",
               files.map((n) => JSON.stringify("./assets/" + n)).join(","),
