@@ -1,0 +1,17 @@
+node_modules/
+.pnpm-store/
+/github-result.png
+.dependency-recovery/
+/synthetic-test.png
+/test-results.png
+/preview.png
+dist/
+public/vendor/
+*.tsbuildinfo
+.env*
+captures/
+exports/
+*.pdf
+*.jpg
+*.jpeg
+*.zip
