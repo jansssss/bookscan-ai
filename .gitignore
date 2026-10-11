@@ -17,6 +17,7 @@ exports/
 *.jpeg
 *.zip
 *.apk
+*.apk.sha256
 android/.gradle/
 android/**/build/
 android/app/src/main/assets/web/
