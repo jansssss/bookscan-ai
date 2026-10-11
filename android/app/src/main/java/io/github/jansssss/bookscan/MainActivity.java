@@ -10,7 +10,10 @@ import android.webkit.WebResourceRequest;
 import android.webkit.WebResourceResponse;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
+import android.widget.FrameLayout;
 import androidx.core.content.FileProvider;
+import androidx.core.view.ViewCompat;
+import androidx.core.view.WindowInsetsCompat;
 import androidx.webkit.WebViewAssetLoader;
 import com.google.mlkit.vision.documentscanner.GmsDocumentScannerOptions;
 import com.google.mlkit.vision.documentscanner.GmsDocumentScanning;
@@ -58,18 +61,22 @@ public class MainActivity extends Activity {
                 return !request.getUrl().toString().startsWith(ORIGIN + "/assets/web/");
             }
         });
-        // Keep content clear of both the status bar and gesture navigation on Android 15+.
-        web.setOnApplyWindowInsetsListener((view, insets) -> {
-            if (android.os.Build.VERSION.SDK_INT >= 30) {
-                android.graphics.Insets bars = insets.getInsets(android.view.WindowInsets.Type.systemBars());
-                view.setPadding(bars.left, bars.top, bars.right, bars.bottom);
-            } else {
-                view.setPadding(insets.getSystemWindowInsetLeft(), insets.getSystemWindowInsetTop(),
-                    insets.getSystemWindowInsetRight(), insets.getSystemWindowInsetBottom());
-            }
-            return insets;
+        // Resize the WebView itself: its padding does not inset CSS fixed-position menus.
+        FrameLayout content = new FrameLayout(this);
+        content.setBackgroundColor(android.graphics.Color.rgb(247, 246, 241));
+        content.addView(web, new FrameLayout.LayoutParams(
+            FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
+        ViewCompat.setOnApplyWindowInsetsListener(content, (view, insets) -> {
+            int types = WindowInsetsCompat.Type.systemBars() | WindowInsetsCompat.Type.displayCutout()
+                | WindowInsetsCompat.Type.ime();
+            androidx.core.graphics.Insets safe = insets.getInsets(types);
+            view.setPadding(safe.left, safe.top, safe.right, safe.bottom);
+            // The container already uses these insets; avoid applying them again in WebView.
+            return new WindowInsetsCompat.Builder(insets)
+                .setInsets(types, androidx.core.graphics.Insets.NONE).build();
         });
-        setContentView(web);
+        setContentView(content);
+        ViewCompat.requestApplyInsets(content);
         web.loadUrl(ORIGIN + "/assets/web/index.html");
     }
 
