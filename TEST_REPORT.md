@@ -2,6 +2,12 @@
 
 ## Android APK 추가 검증 (2026-10-11)
 
+### 0.2.1 하단 시스템 내비게이션 겹침 수정
+
+사용자가 S23에 0.2.0을 설치해 사용했으며 하단 메뉴와 시스템 버튼이 겹치는 화면을 제공했습니다. 커밋 `5d8286b`, Actions 작업 `38107292991`에서 컨테이너 여백으로 WebView 자체 크기를 조절하고 처리한 insets를 0으로 전달하도록 수정했습니다. 웹 테스트·빌드와 Android assembleDebug/lintDebug가 통과했습니다. 수정 효과의 실제 S23 확인은 필요합니다.
+
+0.2.1 APK는 45,171,896바이트, SHA-256 `cbb57529d595b68439fabaf6648fc0ba5ae6a80f062264d024bcda43cffb3477`이며 아티팩트의 체크섬과 일치합니다. APK v2 서명 블록의 인증서 지문 비교에서 기존 전달 APK와 새 APK의 서명이 다름을 확인했습니다. 기존 인증서 SHA-256은 `272f05764efc10b1b709f244a01e5d5bb7e4f801d1a6e98a6abfcd3a9dfe4476`, 새 인증서는 `4addccfec35b9efea6840b48ce3c7e59d9f611fb97446c77733a489b076d5f4f`입니다. 이 기존 버전 위에 업데이트 설치는 불가합니다. 앱 삭제 전 자료를 내보내야 하며, ZIP 재가져오기로 앱 자료를 복원하는 기능은 아직 없습니다.
+
 Galaxy S23 / Android 16 사용 요청에 따라 Android 네이티브 Google ML Kit 문서 스캐너를 연결했습니다. 기존 화면은 앱 안에 포함하며, 네이티브 촬영 결과 저장과 Android 파일 선택기·공유 연결을 구현했습니다. 자세한 범위는 `android/README.md`에 기록했습니다.
 
 소스 커밋 `7af3f67`의 GitHub Actions Android APK 작업 `38102582801`에서 웹 단위 테스트 7개, 타입 검사·웹 빌드, Android `assembleDebug lintDebug` 모두 통과했습니다. 다운로드한 APK의 SHA-256을 빌드 결과와 비교했고, AndroidManifest·DEX·웹 화면·OpenCV·한국어 OCR 모델 포함을 확인했습니다. 파일 크기는 45,171,598바이트입니다.
