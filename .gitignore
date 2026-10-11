@@ -15,3 +15,10 @@ exports/
 *.jpg
 *.jpeg
 *.zip
+*.apk
+android/.gradle/
+android/**/build/
+android/app/src/main/assets/web/
+android/local.properties
+*.keystore
+*.jks

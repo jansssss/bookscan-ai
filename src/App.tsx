@@ -7,6 +7,7 @@ import { mapFromRect } from "./geometry";
 import Camera from "./Camera";
 import Editor from "./Editor";
 import { recognize, orientation } from "./ocr";
+import { native, nativeScan } from "./native";
 import { metadata, pdf, zip, saveFile, stem } from "./export";
 type Editing = {
   blob: Blob;
@@ -253,6 +254,60 @@ export default function App() {
       }
     });
   }
+  async function startCapture() {
+    if (!project || busy) return;
+    if (!native()) {
+      setCamera(true);
+      return;
+    }
+    const target = project;
+    const replace = retake.current;
+    retake.current = null;
+    await task(async () => {
+      setStatus("Google 스캐너 준비 중…");
+      const urls = await nativeScan(replace ? 1 : 50);
+      if (!urls.length) {
+        setStatus("");
+        return;
+      }
+      let order =
+        Math.max(0, ...(await db.pages(target.id)).map((p) => p.order)) + 1;
+      for (let i = 0; i < urls.length; i++) {
+        setStatus(`${i + 1}/${urls.length}장 보관 중…`);
+        const result = await fetch(urls[i]);
+        if (!result.ok) throw Error("스캔 결과를 읽을 수 없습니다.");
+        const image = await result.blob();
+        const originalId = await db.stageCapture(
+          target.id,
+          image,
+          fullQuad,
+          [],
+        );
+        const page: Page = {
+          id: replace?.id || crypto.randomUUID(),
+          project: target.id,
+          originalId,
+          order: replace?.order || order++,
+          image,
+          thumb: await thumbnail(image),
+          quad: fullQuad,
+          mode: "original",
+          date: new Date().toISOString(),
+          hash: [],
+          text: "",
+          confidence: null,
+          words: [],
+          captureSource: "mlkit",
+        };
+        await db.savePages([page], { id: originalId, image });
+        native()!.releaseScan(urls[i].split("/").pop()!);
+        setProgress((i + 1) / urls.length);
+        if (replace) setCurrent(page);
+      }
+      await refresh(target);
+      setStatus(`${urls.length}장 저장 완료`);
+    });
+  }
   async function commit(q: Quad, m: Mode) {
     if (!editing) return;
     if (project?.settings.spread && !editing.page) {
@@ -487,7 +542,7 @@ export default function App() {
       </>
     );
   return (
-    <div className="app">
+    <div className={native() ? "app android-app" : "app"}>
       <header className="topbar">
         <a
           className="brand"
@@ -902,11 +957,14 @@ export default function App() {
                 </button>
               </div>
             )}
-            <p>
-              ZIP에는 PDF, 원본, 보정 이미지, OCR TXT, 연결 정보 JSON이
-              포함됩니다. 현재 PDF는 이미지 PDF이며 검색 텍스트는 TXT·JSON으로
-              제공합니다.
-            </p>
+            <details className="notice">
+              <summary>ZIP 구성과 PDF 안내</summary>
+              <p>
+                ZIP에는 PDF, 원본, 보정 이미지, OCR TXT, 연결 정보 JSON이
+                포함됩니다. 현재 PDF는 이미지 PDF이며 검색 텍스트는 TXT·JSON으로
+                제공합니다.
+              </p>
+            </details>
             {pdfPreview && (
               <a
                 className="primary"
@@ -919,7 +977,7 @@ export default function App() {
             )}
           </section>
         ) : current ? (
-          <section className="panel">
+          <section className="panel page-detail">
             <div className="section-title">
               <h2>{current.order}페이지 · OCR</h2>
               <button
@@ -938,6 +996,15 @@ export default function App() {
                 alt={`${current.order}페이지 원본 보기`}
               />
             </div>
+            {current.captureSource === "mlkit" && (
+              <details className="notice">
+                <summary>Google 스캔 결과</summary>
+                <p>
+                  보정된 JPEG를 보관합니다. Google 스캐너는 촬영 전 원본을
+                  반환하지 않으므로 원본 영역도 이 JPEG 기준입니다.
+                </p>
+              </details>
+            )}
             <div className="actions">
               <button onClick={() => edit(current)}>모서리 보정</button>
               <button
@@ -1022,7 +1089,7 @@ export default function App() {
               <button
                 onClick={() => {
                   retake.current = current;
-                  setCamera(true);
+                  startCapture();
                 }}
               >
                 재촬영
@@ -1122,7 +1189,7 @@ export default function App() {
             <label>
               인식 결과 직접 수정
               <textarea
-                rows={12}
+                rows={5}
                 value={current.text}
                 onChange={(e) =>
                   setCurrent({ ...current, text: e.target.value })
@@ -1165,7 +1232,11 @@ export default function App() {
                 {Math.max(0, ...pages.map((p) => p.order)) + 1}페이지
               </p>
               <div className="actions">
-                <button className="primary" onClick={() => setCamera(true)}>
+                <button
+                  className="primary"
+                  disabled={busy}
+                  onClick={startCapture}
+                >
                   ◉ 촬영 시작
                 </button>
                 <button disabled={busy} onClick={() => input.current?.click()}>
@@ -1186,7 +1257,7 @@ export default function App() {
                   e.target.value = "";
                 }}
               />
-              <div className="segmented">
+              <div className="segmented" hidden={!!native()}>
                 <button
                   className={!project.settings.spread ? "selected" : ""}
                   onClick={() =>
@@ -1323,7 +1394,7 @@ export default function App() {
         >
           <span>▤</span>내 문서
         </button>
-        <button disabled={!project} onClick={() => project && setCamera(true)}>
+        <button disabled={!project || busy} onClick={startCapture}>
           <span>⊙</span>촬영
         </button>
         <button

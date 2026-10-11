@@ -821,3 +821,112 @@ progress {
     font-size: 13px;
   }
 }
+
+/* Mobile workspace: keep the document and primary controls within easy reach. */
+[hidden] {
+  display: none !important;
+}
+@media (max-width: 700px) {
+  main {
+    padding: 12px 14px 88px;
+  }
+  .topbar {
+    height: 52px;
+    padding: 0 14px;
+  }
+  .hero {
+    min-height: 0;
+    padding: 8px 0 16px;
+  }
+  .hero h1 {
+    font-size: 24px;
+    line-height: 1.3;
+    margin: 8px 0;
+  }
+  .hero .eyebrow,
+  .hero p,
+  .hero-tag,
+  .book-art {
+    display: none;
+  }
+  .panel {
+    padding: 14px;
+  }
+  .section-title {
+    margin-bottom: 12px;
+  }
+  .eyebrow {
+    font-size: 9px;
+  }
+  .project-header {
+    padding: 0 0 12px;
+  }
+  .project-header .eyebrow {
+    margin-top: 8px;
+  }
+  .project-header h1 {
+    font-size: 23px;
+    margin: 6px 0;
+  }
+  .project-header p {
+    margin: 6px 0;
+    font-size: 12px;
+  }
+  .actions {
+    gap: 8px;
+    margin: 10px 0;
+  }
+  .segmented {
+    margin: 10px 0;
+  }
+  .page-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+  }
+  .page-thumb {
+    height: 145px;
+    padding: 8px;
+  }
+  .page-meta {
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+  .page-meta button {
+    min-height: 36px;
+    min-width: 28px;
+  }
+  .page-detail .ocr-image {
+    max-height: 40dvh;
+  }
+  .page-detail .ocr-image img {
+    max-height: 40dvh;
+  }
+  .page-editor .edit-stage {
+    max-height: 52dvh;
+  }
+  .page-editor .edit-stage img {
+    max-height: 52dvh;
+  }
+  .page-editor > p {
+    font-size: 11px;
+    margin: 6px 0;
+  }
+  .page-editor > .actions {
+    position: sticky;
+    bottom: 62px;
+    background: #fff;
+    padding: 8px 0;
+    z-index: 3;
+  }
+  .status {
+    padding: 8px 10px;
+    margin-bottom: 10px;
+    font-size: 12px;
+  }
+  .footnote {
+    font-size: 11px;
+  }
+  .bottom-nav {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+}

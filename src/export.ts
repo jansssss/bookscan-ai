@@ -27,6 +27,9 @@ export function metadata(project: Project, pages: Page[]) {
       ocrConfidence: p.confidence,
       words: p.words,
       scannedAt: p.date,
+      captureSource: p.captureSource || "web",
+      originalKind:
+        p.captureSource === "mlkit" ? "scanner-result" : "camera-original",
       mode: p.mode,
       quad: p.quad,
       experimentalDewarp: p.dewarp || 0,
@@ -129,6 +132,8 @@ export async function zip(
   return new Blob(parts, { type: "application/zip" });
 }
 export async function saveFile(blob: Blob, name: string, share = false) {
+  const { native, nativeSave } = await import("./native");
+  if (native()) return nativeSave(blob, name, share);
   const file = new File([blob], name, { type: blob.type });
   if (share && navigator.canShare?.({ files: [file] })) {
     await navigator.share({ files: [file], title: name });

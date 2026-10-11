@@ -45,6 +45,7 @@ export type Page = {
   words: Word[];
   dewarp?: number;
   needsReview?: boolean;
+  captureSource?: "mlkit";
   rotation?: number;
   imageBytes?: number;
   originalBytes?: number;

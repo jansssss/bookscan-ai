@@ -54,7 +54,7 @@ export default function Editor({
     }
   }
   return (
-    <section className="panel">
+    <section className="panel page-editor">
       <div className="section-title">
         <div>
           <span className="eyebrow">PAGE EDITOR</span>
