@@ -902,10 +902,10 @@ progress {
     max-height: 40dvh;
   }
   .page-editor .edit-stage {
-    max-height: 52dvh;
+    width: min(100%, calc(52dvh * var(--page-ratio, 0.75)));
   }
   .page-editor .edit-stage img {
-    max-height: 52dvh;
+    height: auto;
   }
   .page-editor > p {
     font-size: 11px;

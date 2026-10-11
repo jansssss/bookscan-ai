@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import type { CSSProperties } from "react";
 import type { Quad, Mode } from "./types";
 import { fullQuad } from "./types";
 import { validQuad } from "./geometry";
@@ -32,6 +33,7 @@ export default function Editor({
     [selected, setSelected] = useState(mode),
     [url, setUrl] = useState(""),
     [preview, setPreview] = useState<Blob | null>(null),
+    [ratio, setRatio] = useState(0.75),
     [busy, setBusy] = useState(false),
     [error, setError] = useState("");
   const drag = useRef<number | null>(null),
@@ -67,6 +69,7 @@ export default function Editor({
       </p>
       <div
         className="edit-stage"
+        style={{ "--page-ratio": ratio } as CSSProperties}
         ref={stage}
         onPointerMove={(e) => {
           if (drag.current === null || preview) return;
@@ -92,7 +95,10 @@ export default function Editor({
         onPointerUp={() => (drag.current = null)}
         onPointerCancel={() => (drag.current = null)}
       >
-        <img src={url} alt="보정할 원본 페이지" />
+        <img src={url} alt="보정할 원본 페이지" onLoad={(e) => {
+          const image = e.currentTarget;
+          setRatio(image.naturalWidth / image.naturalHeight);
+        }} />
         {!preview && (
           <svg viewBox="0 0 1 1" preserveAspectRatio="none">
             <polygon points={quad.map((p) => `${p.x},${p.y}`).join(" ")} />
