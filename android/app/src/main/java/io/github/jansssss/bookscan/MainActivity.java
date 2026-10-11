@@ -60,12 +60,13 @@ public class MainActivity extends Activity {
         });
         // Keep content clear of both the status bar and gesture navigation on Android 15+.
         web.setOnApplyWindowInsetsListener((view, insets) -> {
-            android.graphics.Insets bars = android.os.Build.VERSION.SDK_INT >= 30
-                ? insets.getInsets(android.view.WindowInsets.Type.systemBars()) : null;
-            view.setPadding(bars == null ? insets.getSystemWindowInsetLeft() : bars.left,
-                bars == null ? insets.getSystemWindowInsetTop() : bars.top,
-                bars == null ? insets.getSystemWindowInsetRight() : bars.right,
-                bars == null ? insets.getSystemWindowInsetBottom() : bars.bottom);
+            if (android.os.Build.VERSION.SDK_INT >= 30) {
+                android.graphics.Insets bars = insets.getInsets(android.view.WindowInsets.Type.systemBars());
+                view.setPadding(bars.left, bars.top, bars.right, bars.bottom);
+            } else {
+                view.setPadding(insets.getSystemWindowInsetLeft(), insets.getSystemWindowInsetTop(),
+                    insets.getSystemWindowInsetRight(), insets.getSystemWindowInsetBottom());
+            }
             return insets;
         });
         setContentView(web);
